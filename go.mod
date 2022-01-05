@@ -1,4 +1,4 @@
-module rest_api_tests.go
+module poc-table-drived-rest-api-tests
 
 go 1.13
 
