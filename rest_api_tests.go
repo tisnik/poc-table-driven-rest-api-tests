@@ -215,6 +215,57 @@ type RestAPITest struct {
 	AdditionalChecker      func(F *frisby.Frisby)
 }
 
+// checkEndPoint performs request to selected endpoint and check the response
+func checkEndPoint(test *RestAPITest) {
+	// prepare Frisby test object
+	url := apiURL + test.Endpoint
+	f := frisby.Create(test.Message)
+	f.Method = test.Method
+	f.Url = url
+
+	if test.AuthHeader {
+		if test.AuthHeaderOrganization != 0 {
+			setAuthHeaderForOrganization(f, test.AuthHeaderOrganization)
+		} else {
+			setAuthHeader(f)
+		}
+	}
+
+	// perform the request
+	f.Send()
+
+	// check the response
+	f.ExpectStatus(test.ExpectedStatus)
+
+	// check the response type
+	if test.ExpectedContentType != None {
+		f.ExpectHeader(contentTypeHeader, test.ExpectedContentType)
+	}
+
+	// perform additional check, if setup
+	if test.AdditionalChecker != nil {
+		test.AdditionalChecker(f)
+	}
+
+	// status can be returned in JSON format too
+	if test.ExpectedResponseStatus != None {
+		statusResponseChecker(f, test.ExpectedResponseStatus)
+	}
+
+	// print overall status of test to terminal
+	f.PrintReport()
+}
+
+// runAllTests function run all REST API tests provided in argument. Number of
+// errors found is returned (zero in case of no error).
+func runAllTests(tests []RestAPITest) int {
+	for _, test := range tests {
+		checkEndPoint(&test)
+	}
+	frisby.Global.PrintReport()
+	return frisby.Global.NumErrored
+}
+
 func main() {
 	fmt.Println("vim-go")
 
