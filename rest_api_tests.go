@@ -155,6 +155,52 @@ type InfoResponse struct {
 	Status string            `json:"status"`
 }
 
+func metricsEndPointContentTypeChecker(f *frisby.Frisby) {
+	f.Expect(func(f *frisby.Frisby) (bool, string) {
+		header := f.Resp.Header.Get(contentTypeHeader)
+		if strings.HasPrefix(header, "text/plain") {
+			return true, OkStatusResponse
+		}
+		return false, fmt.Sprintf("Expected Header %q to be %q, but got %q", contentTypeHeader, "text/plain", header)
+	})
+}
+
+// elementary checks for /info endpoint
+func infoResponseChecker(f *frisby.Frisby) {
+	var expectedInfoKeys []string = []string{
+		"BuildBranch",
+		"BuildCommit",
+		"BuildTime",
+		"BuildVersion",
+		"DB_version",
+		"UtilsVersion",
+	}
+
+	// check the response
+	text, err := f.Resp.Content()
+	if err != nil {
+		f.AddError(err.Error())
+	} else {
+		response := InfoResponse{}
+		err := json.Unmarshal(text, &response)
+		if err != nil {
+			f.AddError(err.Error())
+		}
+		if response.Status != "ok" {
+			f.AddError("Expecting 'status' to be set to 'ok'")
+		}
+		if len(response.Info) == 0 {
+			f.AddError("Info node is empty")
+		}
+		for _, expectedKey := range expectedInfoKeys {
+			_, found := response.Info[expectedKey]
+			if !found {
+				f.AddError("Info node does not contain key " + expectedKey)
+			}
+		}
+	}
+}
+
 // RestAPITest represents specification of one REST API call (request) and
 // expected response
 type RestAPITest struct {
