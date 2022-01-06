@@ -16,7 +16,74 @@ limitations under the License.
 
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+	"strings"
+
+	"encoding/base64"
+	"encoding/json"
+	"github.com/verdverm/frisby"
+	"net/http"
+
+	"github.com/RedHatInsights/insights-results-aggregator-data/testdata"
+
+	httputils "github.com/RedHatInsights/insights-operator-utils/http"
+	server "github.com/RedHatInsights/insights-results-aggregator/server"
+	"github.com/RedHatInsights/insights-results-aggregator/types"
+)
+
+// common constants used by REST API tests
+const (
+	apiURL              = "http://localhost:8080/api/v1/"
+	contentTypeHeader   = "Content-Type"
+	contentLengthHeader = "Content-Length"
+
+	authHeaderName = "x-rh-identity"
+
+	// ContentTypeJSON represents MIME type for JSON format
+	ContentTypeJSON = "application/json; charset=utf-8"
+
+	// ContentTypeJSON represents MIME type for JSON format
+	ContentTypeJSONWithoutCharset = "application/json"
+
+	// ContentTypeText represents MIME type for plain text format
+	ContentTypeText = "text/plain; charset=utf-8"
+
+	// knownOrganizationID represents ID of known organization
+	knownOrganizationID = "1"
+
+	// unknownOrganizationID represents ID of inknown organization
+	unknownOrganizationID = "100000"
+
+	wrongOrganizationID = "foobar"
+
+	knownClusterForOrganization1   = "00000000-0000-0000-0000-000000000000"
+	knownCluster2ForOrganization1  = "00000000-0000-0000-ffff-000000000000"
+	knownCluster3ForOrganization1  = "00000000-0000-0000-0000-ffffffffffff"
+	unknownClusterForOrganization1 = "00000000-0000-0000-0000-000000000001"
+
+	// no response status
+	None = ""
+)
+
+// states
+const (
+	OkStatusResponse = server.OkStatusPayload
+	MissingAuthToken = "Missing auth token"
+)
+
+// list of known organizations that are stored in test database
+var knownOrganizations = []int{1, 2, 3, 4}
+
+// list of unknown organizations that are not stored in test database
+var unknownOrganizations = []int{5, 6, 7, 8}
+
+// list of improper organization IDs
+var improperOrganizations = []int{-1000, -1, 0}
+
+// user account number
+const accountNumber = "42"
 
 // setAuthHeaderForOrganization set authorization header to request
 func setAuthHeaderForOrganization(f *frisby.Frisby, orgID int) {
