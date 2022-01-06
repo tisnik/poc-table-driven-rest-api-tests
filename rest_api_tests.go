@@ -30,15 +30,24 @@ type ClustersResponse struct {
 	Status   string   `json:"status"`
 }
 
+// InfoResponse represents response from /info endpoint
+type InfoResponse struct {
+	Info   map[string]string `json:"info"`
+	Status string            `json:"status"`
+}
+
 // RestAPITest represents specification of one REST API call (request) and
 // expected response
 type RestAPITest struct {
-	Endpoint       string
-	Method         string
-	Message        string
-	AuthHeader     bool
-	ExpectedStatus int
-	ExpectedType   string
+	Endpoint               string
+	Method                 string
+	Message                string
+	AuthHeader             bool
+	AuthHeaderOrganization int
+	ExpectedStatus         int
+	ExpectedContentType    string
+	ExpectedResponseStatus string
+	AdditionalChecker      func(F *frisby.Frisby)
 }
 
 func main() {
