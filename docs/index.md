@@ -1,37 +1,178 @@
-## Welcome to GitHub Pages
+## Proof of concept: table-driven REST API tests in Go
 
-You can use the [editor on GitHub](https://github.com/tisnik/poc-table-driven-rest-api-tests/edit/master/docs/index.md) to maintain and preview the content for your website in Markdown files.
+### The problem
 
-Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
+* REST API tests written in Go and based on Frisby are now standard way in Go ecosystem.
+* OTOH tests are usually specified as plain Go sources
+    - repetitive patterns
+    - it's too easy to omit some checks
 
-### Markdown
+### Existing tests
 
-Markdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for
-
-```markdown
-Syntax highlighted code block
-
-# Header 1
-## Header 2
-### Header 3
-
-- Bulleted
-- List
-
-1. Numbered
-2. List
-
-**Bold** and _Italic_ and `Code` text
-
-[Link](url) and ![Image](src)
+```go
+func checkRestAPIEntryPoint() {
+	f := frisby.Create("Check the entry point to REST API using HTTP GET method").Get(apiURL)
+	setAuthHeader(f)
+	f.Send()
+	f.ExpectStatus(200)
+	f.ExpectHeader(contentTypeHeader, ContentTypeJSON)
+	f.PrintReport()
+}
 ```
 
-For more details see [Basic writing and formatting syntax](https://docs.github.com/en/github/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax).
+```go
+func checkReportEndpointForImproperOrganization() {
+	url := constructURLForReportForOrgCluster(wrongOrganizationID, knownClusterForOrganization1, testdata.UserID)
+	f := frisby.Create("Check the endpoint to return report for improper organization").Get(url)
+	setAuthHeader(f)
+	f.Send()
+	f.ExpectStatus(400)
+	f.ExpectHeader(contentTypeHeader, ContentTypeJSON)
 
-### Jekyll Themes
+        // actually this part is refactored into own function
+	text, err := f.Resp.Content()
+	if err != nil {
+		f.AddError(err.Error())
+	} else {
+		err := json.Unmarshal(text, &response)
+		if err != nil {
+			f.AddError(err.Error())
+		}
+	}
+	if response.Status == server.OkStatusPayload {
+		f.AddError(fmt.Sprintf("Expected error status, but got '%s' instead", response.Status))
+	}
 
-Your Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/tisnik/poc-table-driven-rest-api-tests/settings/pages). The name of this theme is saved in the Jekyll `_config.yml` configuration file.
+	f.PrintReport()
+}
+```
 
-### Support or Contact
 
-Having trouble with Pages? Check out our [documentation](https://docs.github.com/categories/github-pages-basics/) or [contact support](https://support.github.com/contact) and we’ll help you sort it out.
+### Check omit by mistake
+
+```go
+func checkRestAPIEntryPoint() {
+	f := frisby.Create("Check the entry point to REST API using HTTP GET method").Get(apiURL)
+	setAuthHeader(f)
+	f.Send()
+	f.ExpectStatus(200)
+	// omited f.ExpectHeader(contentTypeHeader, ContentTypeJSON)
+	f.PrintReport()
+}
+```
+
+### Proposed solution
+
+* Table-driven approach
+* Use Go arrays/slices of structs to define tests
+* Pros
+    - syntax checks
+    - readability
+    - ability to specify callback functions/handlers to be called to perform action or check something
+* Cons
+    - not much space to reinvent the wheel :)
+
+### Test structure
+
+```go
+type RestAPITest struct {
+	Endpoint               string
+	Method                 string
+	Message                string
+	AuthHeader             bool
+	AuthHeaderOrganization int
+	ExpectedStatus         int
+	ExpectedContentType    string
+	ExpectedResponseStatus string
+	AdditionalChecker      func(F *frisby.Frisby)
+}
+```
+
+* Most items can be left unspecified - default options supported
+
+```go
+var tests []RestAPITest = []RestAPITest{
+	{
+		Message:                "Check the entry point to REST API using HTTP GET method",
+		Endpoint:               "",
+		Method:                 http.MethodGet,
+		AuthHeader:             true,
+		ExpectedStatus:         http.StatusOK,
+		ExpectedContentType:    ContentTypeJSON,
+		ExpectedResponseStatus: OkStatusResponse,
+	},
+        ...
+        ...
+        ...
+	{
+		Message:                "Check the endpoint to retrieve report for improper organization",
+		Endpoint:               constructURLForReportForOrgCluster(wrongOrganizationID, knownClusterForOrganization1, testdata.UserID),
+		Method:                 http.MethodGet,
+		AuthHeader:             true,
+		ExpectedStatus:         http.StatusBadRequest,
+		ExpectedContentType:    ContentTypeJSON,
+		ExpectedResponseStatus: "Error during parsing param 'org_id' with value 'foobar'. Error: 'unsigned integer expected'",
+	},
+```
+
+### One unified test implementation
+
+```go
+func checkEndPoint(test *RestAPITest) {
+	// prepare Frisby test object
+	url := apiURL + test.Endpoint
+	f := frisby.Create(test.Message)
+	f.Method = test.Method
+	f.Url = url
+
+	if test.AuthHeader {
+		if test.AuthHeaderOrganization != 0 {
+			setAuthHeaderForOrganization(f, test.AuthHeaderOrganization)
+		} else {
+			setAuthHeader(f)
+		}
+	}
+
+	// perform the request
+	f.Send()
+
+	// check the response
+	f.ExpectStatus(test.ExpectedStatus)
+
+	// check the response type
+	if test.ExpectedContentType != None {
+		f.ExpectHeader(contentTypeHeader, test.ExpectedContentType)
+	}
+
+	// perform additional check, if setup
+	if test.AdditionalChecker != nil {
+		test.AdditionalChecker(f)
+	}
+
+	// status can be returned in JSON format too
+	if test.ExpectedResponseStatus != None {
+		statusResponseChecker(f, test.ExpectedResponseStatus)
+	}
+
+	// print overall status of test to terminal
+	f.PrintReport()
+}
+```
+
+### Test runner is trivial
+
+```go
+func runAllTests(tests []RestAPITest) int {
+	for _, test := range tests {
+		checkEndPoint(&test)
+	}
+	frisby.Global.PrintReport()
+	return frisby.Global.NumErrored
+}
+```
+
+### Conclusion
+
+* We don't have to reinvent the wheel (= make yet another DSL)
+* Still the test specification is perfectly readable and checkable
+* Room for improvements
