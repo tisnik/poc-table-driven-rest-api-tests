@@ -1,0 +1,13 @@
+
+
+Proposed solution
+-----------------
+▶ Table-driven approach
+▶ Use Go arrays/slices of structs to define tests
+▶ Pros
+    ◆ syntax checks
+    ◆ readability
+    ◆ ability to specify callback functions/handlers to be called
+      to perform action or check something
+▶ Cons
+    ◆ not much space to reinvent the wheel :)

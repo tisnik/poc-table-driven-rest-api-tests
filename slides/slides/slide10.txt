@@ -1,0 +1,6 @@
+
+
+Test structure
+--------------
+▶ Most items can be left unspecified
+    - default options supported

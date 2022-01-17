@@ -1,0 +1,8 @@
+
+
+The problem
+-----------
+▶ REST API tests written in Go and based on Frisby are now standard way in Go ecosystem.
+▶ OTOH tests are usually specified as plain Go sources
+    ◆ repetitive patterns
+    ◆ it's too easy to omit some checks

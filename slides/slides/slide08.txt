@@ -1,0 +1,5 @@
+
+
+Test structure
+--------------
+▶ A real Go data type checked by compiler etc.

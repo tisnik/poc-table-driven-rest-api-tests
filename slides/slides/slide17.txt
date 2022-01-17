@@ -1,0 +1,7 @@
+
+
+Conclusion
+----------
+▶ We don't have to reinvent the wheel (= make yet another DSL)
+▶ Still the test specification is perfectly readable and checkable
+▶ There's room for improvements
